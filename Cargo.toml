@@ -1,0 +1,12 @@
+[package]
+name = "aws-pass"
+version = "0.1.0"
+authors = ["Geoff Little <g.little712@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+pretty_env_logger = "0.4"
+rusoto_core = "0.45"
+rusoto_secretsmanager = "0.45.0"
+tokio = { version = "0.2.23", features = ["full"] }
