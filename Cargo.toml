@@ -5,11 +5,13 @@ authors = ["Geoff Little <g.little712@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-async-trait = "0.1.42"
-clap = "3.0.0-beta.2"
+async-trait = "0.1"
+bytes = "0.6"
 dirs = "3.0"
+futures = "0.3"
 log = "0.4"
 pretty_env_logger = "0.4"
 rusoto_core = "0.45"
 rusoto_secretsmanager = "0.45"
+structopt = "0.3"
 tokio = { version = "0.2.23", features = ["full"] }
