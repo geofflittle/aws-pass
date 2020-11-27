@@ -5,7 +5,9 @@ mod client;
 mod dao;
 mod store;
 mod util;
-use dao::{local_pass_dao::LocalPassDao, pass_dao::PassDao, sm_pass_dao::SMPassDao};
+use dao::{
+    local_pass_dao::LocalPassDao, pass_dao::PassDao, sm_pass_dao::SMPassDao,
+};
 use rusoto_core::Region;
 use std::{env, path};
 use store::default_pass_store::DefaultPassStore;
@@ -69,7 +71,8 @@ async fn main() {
             false => Box::new(SMPassDao::new(Region::UsEast1)),
         }
     };
-    let pass_store: Box<dyn PassStore> = DefaultPassStore::new(store_dir, pass_dao);
+    let pass_store: Box<dyn PassStore> =
+        DefaultPassStore::new(store_dir, pass_dao);
     match opt.cmd {
         Command::Init {} => pass_store.init().await,
         Command::List { prefix } => pass_store.list(prefix.as_deref()).await,

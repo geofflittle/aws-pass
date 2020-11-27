@@ -17,7 +17,11 @@ impl SMPassDao {
 
 #[async_trait]
 impl PassDao for SMPassDao {
-    async fn create_password(&self, name: &str, value: &str) -> Result<String, PassDaoErr> {
+    async fn create_password(
+        &self,
+        name: &str,
+        value: &str,
+    ) -> Result<String, PassDaoErr> {
         // TODO: Use better error handling
         self.sm_client
             .create_secret_string(name, value)
@@ -40,7 +44,11 @@ impl PassDao for SMPassDao {
             .unwrap()
     }
 
-    async fn update_password(&self, id: &str, value: &str) -> Result<(), PassDaoErr> {
+    async fn update_password(
+        &self,
+        id: &str,
+        value: &str,
+    ) -> Result<(), PassDaoErr> {
         // TODO: Use better error handling
         self.sm_client
             .put_secret_string(id, value)
@@ -58,7 +66,10 @@ impl PassDao for SMPassDao {
             .unwrap()
     }
 
-    async fn list_passwords(&self, filters: &[Filter]) -> Result<Vec<PasswordDetails>, PassDaoErr> {
+    async fn list_passwords(
+        &self,
+        filters: &[Filter],
+    ) -> Result<Vec<PasswordDetails>, PassDaoErr> {
         // TODO: Use better error handling
         Ok(self
             .sm_client

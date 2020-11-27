@@ -1,9 +1,12 @@
-use super::sm_client::{Filter, SMClient, SMClientErr, SecretDetails, SecretString, SecretsPage};
+use super::sm_client::{
+    Filter, SMClient, SMClientErr, SecretDetails, SecretString, SecretsPage,
+};
 use async_trait::async_trait;
 use rusoto_core::Region;
 use rusoto_secretsmanager::{
-    CreateSecretRequest, DeleteSecretRequest, DescribeSecretRequest, GetSecretValueRequest,
-    ListSecretsRequest, PutSecretValueRequest, SecretsManager, SecretsManagerClient, Tag,
+    CreateSecretRequest, DeleteSecretRequest, DescribeSecretRequest,
+    GetSecretValueRequest, ListSecretsRequest, PutSecretValueRequest,
+    SecretsManager, SecretsManagerClient, Tag,
 };
 
 pub struct DefaultSMClient {
@@ -20,7 +23,11 @@ impl DefaultSMClient {
 
 #[async_trait]
 impl SMClient for DefaultSMClient {
-    async fn create_secret_string(&self, name: &str, value: &str) -> Result<String, SMClientErr> {
+    async fn create_secret_string(
+        &self,
+        name: &str,
+        value: &str,
+    ) -> Result<String, SMClientErr> {
         let create_secret_request = CreateSecretRequest {
             name: name.to_string(),
             secret_string: Some(value.to_string()),
@@ -49,7 +56,10 @@ impl SMClient for DefaultSMClient {
         Ok(())
     }
 
-    async fn describe_secret(&self, arn: &str) -> Result<SecretDetails, SMClientErr> {
+    async fn describe_secret(
+        &self,
+        arn: &str,
+    ) -> Result<SecretDetails, SMClientErr> {
         let describe_secret_request = DescribeSecretRequest {
             secret_id: arn.to_string(),
             ..Default::default()
@@ -68,7 +78,10 @@ impl SMClient for DefaultSMClient {
         })
     }
 
-    async fn get_secret_string(&self, arn: &str) -> Result<SecretString, SMClientErr> {
+    async fn get_secret_string(
+        &self,
+        arn: &str,
+    ) -> Result<SecretString, SMClientErr> {
         let get_secret_value_request = GetSecretValueRequest {
             secret_id: arn.to_string(),
             ..Default::default()
@@ -123,7 +136,9 @@ impl SMClient for DefaultSMClient {
                 fs.into_iter()
                     .map(|(k, vs)| rusoto_secretsmanager::Filter {
                         key: Some(k.to_string()),
-                        values: Some(vs.into_iter().map(|v| v.to_string()).collect()),
+                        values: Some(
+                            vs.into_iter().map(|v| v.to_string()).collect(),
+                        ),
                     })
                     .collect()
             }),
@@ -173,7 +188,11 @@ impl SMClient for DefaultSMClient {
         Ok(vec)
     }
 
-    async fn put_secret_string(&self, arn: &str, value: &str) -> Result<(), SMClientErr> {
+    async fn put_secret_string(
+        &self,
+        arn: &str,
+        value: &str,
+    ) -> Result<(), SMClientErr> {
         let put_secret_request = PutSecretValueRequest {
             secret_id: arn.to_string(),
             secret_string: Some(value.to_string()),
@@ -194,7 +213,8 @@ impl SMClient for DefaultSMClient {
         filters: Option<&[Filter]>,
     ) -> Result<(), SMClientErr> {
         // TODO: Use better error handling
-        let secret = self.get_secret_string_by_name(name, filters).await.unwrap();
+        let secret =
+            self.get_secret_string_by_name(name, filters).await.unwrap();
         self.put_secret_string(&secret.arn, value).await
     }
 }

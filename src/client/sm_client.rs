@@ -4,16 +4,26 @@ use async_trait::async_trait;
 pub trait SMClient {
     /// Creates a secret string given a **name** and a **value**, returns the
     /// created secret's **arn**.
-    async fn create_secret_string(&self, name: &str, value: &str) -> Result<String, SMClientErr>;
+    async fn create_secret_string(
+        &self,
+        name: &str,
+        value: &str,
+    ) -> Result<String, SMClientErr>;
 
     /// Deletes the secret for the given **arn**.
     async fn delete_secret(&self, arn: &str) -> Result<(), SMClientErr>;
 
     /// Describes the secret for the given **arn**.
-    async fn describe_secret(&self, arn: &str) -> Result<SecretDetails, SMClientErr>;
+    async fn describe_secret(
+        &self,
+        arn: &str,
+    ) -> Result<SecretDetails, SMClientErr>;
 
     /// Gets the secret for the given **arn**.
-    async fn get_secret_string(&self, arn: &str) -> Result<SecretString, SMClientErr>;
+    async fn get_secret_string(
+        &self,
+        arn: &str,
+    ) -> Result<SecretString, SMClientErr>;
 
     /// Gets the secret for the given **name**.  Secrets are not id'd by their
     /// name so all secrets must be listed and their names checked for
@@ -41,7 +51,11 @@ pub trait SMClient {
     ) -> Result<Vec<SecretDetails>, SMClientErr>;
 
     /// Puts a secret string for the given **arn** and secret **value**.
-    async fn put_secret_string(&self, arn: &str, value: &str) -> Result<(), SMClientErr>;
+    async fn put_secret_string(
+        &self,
+        arn: &str,
+        value: &str,
+    ) -> Result<(), SMClientErr>;
 
     /// Puts a secret string for the given **name**, **value**, and optional
     /// **filters**.  Secrets are not id'd by their name so all secrets must be

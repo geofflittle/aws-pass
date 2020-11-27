@@ -11,7 +11,11 @@ impl LocalPassDao {
 
 #[async_trait]
 impl PassDao for LocalPassDao {
-    async fn create_password(&self, name: &str, value: &str) -> Result<String, PassDaoErr> {
+    async fn create_password(
+        &self,
+        name: &str,
+        value: &str,
+    ) -> Result<String, PassDaoErr> {
         todo!()
     }
 
@@ -19,7 +23,11 @@ impl PassDao for LocalPassDao {
         todo!()
     }
 
-    async fn update_password(&self, id: &str, value: &str) -> Result<(), PassDaoErr> {
+    async fn update_password(
+        &self,
+        id: &str,
+        value: &str,
+    ) -> Result<(), PassDaoErr> {
         todo!()
     }
 

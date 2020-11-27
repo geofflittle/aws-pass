@@ -1,4 +1,6 @@
-use crate::dao::pass_dao::{Filter, PassDao, PassDaoErr, Password, PasswordDetails};
+use crate::dao::pass_dao::{
+    Filter, PassDao, PassDaoErr, Password, PasswordDetails,
+};
 
 use super::pass_store::{PassStore, PassStoreErr};
 use async_trait::async_trait;
