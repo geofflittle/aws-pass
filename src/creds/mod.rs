@@ -38,15 +38,12 @@ impl StsLocalMfaCredsProvider {
 
 impl StsLocalMfaCredsProvider {
     async fn get_creds(&self) -> Credentials {
-        let serial_number = read_first_line(&self.token_serial_path).expect(&format!(
-            "Token path {} has no first line",
-            self.token_serial_path.display()
-        ));
+        let serial_number = read_first_line(&self.token_serial_path).unwrap();
         let token_code = prompt_stdin_line("MFA token code:");
         self.sts_client
             .get_session_token(Some(&900), Some(&serial_number), Some(&token_code))
             .await
-            .expect("No session token")
+            .unwrap()
     }
 }
 

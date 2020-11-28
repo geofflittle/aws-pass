@@ -11,10 +11,3 @@ pub trait PassStore {
     async fn generate(&self, name: &str);
     async fn remove(&self, name: &str);
 }
-
-#[derive(Debug)]
-pub enum PassStoreErr {
-    PasswordAlreadyExists(String),
-    IOError(io::Error),
-    NotFound,
-}

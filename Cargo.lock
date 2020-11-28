@@ -19,6 +19,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf8dcb5b4bbaa28653b647d8c77bd4ed40183b48882e130c1f1ffb73de069fd7"
+
+[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -62,10 +68,12 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 name = "aws-pass"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bytes 0.6.0",
  "chrono",
  "dirs 3.0.1",
+ "edit",
  "env_logger",
  "futures",
  "log",
@@ -301,6 +309,16 @@ name = "dtoa"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
+
+[[package]]
+name = "edit"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "323032447eba6f5aca88b46d6e7815151c16c53e4128569420c09d7840db3bfc"
+dependencies = [
+ "tempfile",
+ "which",
+]
 
 [[package]]
 name = "env_logger"
@@ -1822,6 +1840,15 @@ name = "wasm-bindgen-shared"
 version = "0.2.68"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d649a3145108d7d3fbcde896a468d1bd636791823c9921135218ad89be08307"
+
+[[package]]
+name = "which"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "winapi"

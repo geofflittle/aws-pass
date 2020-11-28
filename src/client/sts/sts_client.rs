@@ -1,3 +1,4 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusoto_core::credential::AwsCredentials;
@@ -9,11 +10,8 @@ pub trait StsClient {
         duration_seconds: Option<&i64>,
         serial_numer: Option<&str>,
         token_code: Option<&str>,
-    ) -> Result<Credentials, StsClientErr>;
+    ) -> Result<Credentials>;
 }
-
-#[derive(Debug)]
-pub enum StsClientErr {}
 
 pub trait Creds {
     fn is_expired(&self) -> bool;

@@ -1,4 +1,5 @@
-use super::sts_client::{Credentials, StsClient, StsClientErr};
+use super::sts_client::{Credentials, StsClient};
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{NaiveDateTime, TimeZone, Utc};
 use log::info;
@@ -16,7 +17,7 @@ impl DefaultStsClient {
     {
         DefaultStsClient {
             sts_client: Box::new(rusoto_sts::StsClient::new_with(
-                HttpClient::new().expect("Unable to new HttpClient"),
+                HttpClient::new().unwrap(),
                 provide_aws_creds,
                 region.clone(),
             )),
@@ -31,7 +32,7 @@ impl StsClient for DefaultStsClient {
         duration_seconds: Option<&i64>,
         serial_number: Option<&str>,
         token_code: Option<&str>,
-    ) -> Result<Credentials, StsClientErr> {
+    ) -> Result<Credentials> {
         let get_session_token_request = GetSessionTokenRequest {
             duration_seconds: duration_seconds.map(|i| i.to_owned()),
             serial_number: serial_number.map(String::from),
@@ -40,20 +41,17 @@ impl StsClient for DefaultStsClient {
         info!("Will send get session token request {:?}", get_session_token_request);
         let get_session_token_response = self.sts_client.get_session_token(get_session_token_request).await;
         info!("Did receive session token response {:?}", get_session_token_response);
-        get_session_token_response
-            .expect("Unable to get session token")
+        get_session_token_response?
             .credentials
             .map(|c| {
                 Ok(Credentials {
                     access_key_id: c.access_key_id,
                     secret_access_key: c.secret_access_key,
                     session_token: c.session_token,
-                    expiration: Utc.from_utc_datetime(
-                        &NaiveDateTime::parse_from_str(&c.expiration, "%Y-%m-%dT%H:%M:%S%Z")
-                            .expect(&format!("Unable to parse session token expiration {}", c.expiration)),
-                    ),
+                    expiration: Utc
+                        .from_utc_datetime(&NaiveDateTime::parse_from_str(&c.expiration, "%Y-%m-%dT%H:%M:%S%Z")?),
                 })
             })
-            .expect("No session token")
+            .unwrap()
     }
 }

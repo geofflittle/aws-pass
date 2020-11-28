@@ -3,11 +3,12 @@ use crate::{
     creds::StsLocalMfaCredsProvider,
     dao::{
         pass_dao::Tag,
-        pass_dao::{Filter, PassDao},
+        pass_dao::{Filter, PassDao, Password},
         sm_pass_dao::SmPassDao,
     },
     util,
 };
+use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
 use std::process;
@@ -16,6 +17,7 @@ use util::write_lines;
 
 const CREDENTIALS_FILENAME: &str = ".credentials";
 const TOKEN_SERIAL_FILENAME: &str = ".token-serial";
+// TODO: Fix tags
 const STORE_TAGS: (&str, &str) = ("aws-pass", "true");
 const STORE_FILTERS: [(&str, [&str; 1]); 2] = [("tag-key", ["aws-pass"]), ("tag-value", ["true"])];
 
@@ -44,15 +46,7 @@ impl DefaultPassStore {
     }
 
     fn ensure_empty_store_dir(&self) {
-        if self.store_dir.exists()
-            && self.store_dir.is_dir()
-            && self
-                .store_dir
-                .read_dir()
-                .expect(&format!("Can't read store dir {}", self.store_dir.display()))
-                .next()
-                .is_some()
-        {
+        if self.store_dir.exists() && self.store_dir.is_dir() && self.store_dir.read_dir().unwrap().next().is_some() {
             fatal_println!("Store dir {} not empty, not overwriting", self.store_dir.display())
         }
         if self.store_dir.exists() && self.store_dir.is_file() {
@@ -60,8 +54,7 @@ impl DefaultPassStore {
         }
         if !self.store_dir.exists() {
             println!("Creating store dir at {}", self.store_dir.display());
-            fs::create_dir(&self.store_dir)
-                .expect(&format!("Unable to create store dir at {}", self.store_dir.display()));
+            fs::create_dir(&self.store_dir).unwrap();
         }
     }
 
@@ -97,6 +90,14 @@ impl DefaultPassStore {
         let token_serial_path = self.store_dir.join(TOKEN_SERIAL_FILENAME);
         write_lines(&token_serial_path, vec![token_serial.as_ref()]);
     }
+
+    async fn get_password_by_name(&self, name: &str) -> Result<Password> {
+        let filters: Vec<Filter> = STORE_FILTERS
+            .iter()
+            .map(|f| (f.0.to_string(), f.1.iter().map(|s| s.to_string()).collect()))
+            .collect();
+        self.pass_dao.get_password_by_name(name, Some(&filters)).await
+    }
 }
 
 #[async_trait]
@@ -123,39 +124,28 @@ impl PassStore for DefaultPassStore {
                 .unwrap_or_default(),
         ]
         .concat();
-        let passwords = self
-            .pass_dao
-            .list_passwords(&filters)
-            .await
-            .expect("Unable to list passwords");
+        let passwords = self.pass_dao.list_passwords(&filters).await.unwrap();
         println!("{:?}", passwords);
     }
 
     async fn show(&self, name: &str) {
-        let filters: Vec<Filter> = STORE_FILTERS
-            .iter()
-            .map(|f| (f.0.to_string(), f.1.iter().map(|s| s.to_string()).collect()))
-            .collect();
-        let password = self
-            .pass_dao
-            .get_password_by_name(name, Some(&filters))
-            .await
-            .expect("Unable to get password");
+        let password = self.get_password_by_name(name).await.unwrap();
         println!("{:?}", password);
     }
 
     async fn insert(&self, name: &str) {
         let value = util::prompt_stdin_line("Enter password:");
         let tags: Vec<Tag> = vec![(STORE_TAGS.0.to_string(), STORE_TAGS.1.to_string())];
-        self.pass_dao
-            .create_password(name, &value, Some(&tags))
-            .await
-            .expect("Unable to create password");
+        self.pass_dao.create_password(name, &value, Some(&tags)).await.unwrap();
     }
 
     async fn edit(&self, name: &str) {
-        // Will need to get the password and open an editor
-        todo!()
+        let password = self.get_password_by_name(name).await.unwrap();
+        let updated_password = edit::edit(password.value).unwrap();
+        self.pass_dao
+            .update_password(&password.id, &updated_password)
+            .await
+            .unwrap();
     }
 
     async fn generate(&self, name: &str) {
@@ -170,6 +160,6 @@ impl PassStore for DefaultPassStore {
         self.pass_dao
             .delete_password_by_name(name, Some(&filters))
             .await
-            .expect("Unable to delete password");
+            .unwrap();
     }
 }

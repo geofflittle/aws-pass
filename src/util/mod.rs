@@ -5,11 +5,9 @@ use std::{
 };
 
 pub fn read_first_line(path: &path::PathBuf) -> Option<String> {
-    let file = fs::File::open(path).expect(&format!("Couldn't open path {}", path.display()));
+    let file = fs::File::open(path).unwrap();
     let buffer = io::BufReader::new(file);
-    let mut lines_iter = buffer
-        .lines()
-        .map(|l| l.expect(&format!("Couldn't read line from path {}", path.display())));
+    let mut lines_iter = buffer.lines().map(|l| l.unwrap());
     return lines_iter.next();
 }
 
@@ -17,10 +15,7 @@ pub fn prompt_stdin_line(prompt: &str) -> String {
     println!("{}", prompt);
     let mut value = String::new();
     let stdin = io::stdin();
-    stdin
-        .lock()
-        .read_line(&mut value)
-        .expect("Couldn't read line from stdin");
+    stdin.lock().read_line(&mut value).unwrap();
     value.trim_end().to_string()
 }
 
@@ -36,10 +31,9 @@ pub fn write_lines<'a, I>(path: &path::PathBuf, lines: I)
 where
     I: iter::IntoIterator<Item = &'a str>,
 {
-    let file = fs::File::create(path).expect(&format!("Unable to open file at {}", path.display()));
+    let file = fs::File::create(path).unwrap();
     let mut lw = io::LineWriter::new(file);
     lines.into_iter().for_each(|line| {
-        lw.write_all(line.as_bytes())
-            .expect(&format!("Unable to write line to file at {}", path.display()));
+        lw.write_all(line.as_bytes()).unwrap();
     });
 }

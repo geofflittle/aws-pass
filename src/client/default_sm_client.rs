@@ -1,4 +1,5 @@
-use super::sm_client::{Filter, SecretDetails, SecretString, SecretsPage, SmClient, SmClientErr, Tag};
+use super::sm_client::{Filter, SecretDetails, SecretString, SecretsPage, SmClient, Tag};
+use anyhow::Result;
 use async_trait::async_trait;
 use log::info;
 use rusoto_core::{credential, HttpClient, Region};
@@ -18,7 +19,7 @@ impl DefaultSmClient {
     {
         DefaultSmClient {
             sm_client: Box::new(SecretsManagerClient::new_with(
-                HttpClient::new().expect("Unable to new HttpClient"),
+                HttpClient::new().unwrap(),
                 provide_aws_creds,
                 region.clone(),
             )),
@@ -28,7 +29,7 @@ impl DefaultSmClient {
 
 #[async_trait]
 impl SmClient for DefaultSmClient {
-    async fn create_secret_string(&self, name: &str, value: &str, tags: Option<&[Tag]>) -> Result<String, SmClientErr> {
+    async fn create_secret_string(&self, name: &str, value: &str, tags: Option<&[Tag]>) -> Result<String> {
         let create_secret_request = CreateSecretRequest {
             client_request_token: Some(uuid::Uuid::new_v4().to_string()),
             name: name.to_string(),
@@ -46,13 +47,10 @@ impl SmClient for DefaultSmClient {
         info!("Will send create secret request {:?}", create_secret_request);
         let create_secret_response = self.sm_client.create_secret(create_secret_request).await;
         info!("Did receive create secret response {:?}", create_secret_response);
-        Ok(create_secret_response
-            .expect("Unable to get create secret response")
-            .arn
-            .expect("Unable to get arn"))
+        Ok(create_secret_response?.arn.unwrap())
     }
 
-    async fn delete_secret(&self, arn: &str) -> Result<(), SmClientErr> {
+    async fn delete_secret(&self, arn: &str) -> Result<()> {
         let delete_secret_request = DeleteSecretRequest {
             secret_id: arn.to_string(),
             ..Default::default()
@@ -60,20 +58,15 @@ impl SmClient for DefaultSmClient {
         info!("Will send delete secret request {:?}", delete_secret_request);
         let delete_secret_response = self.sm_client.delete_secret(delete_secret_request).await;
         info!("Did receive delete secret response {:?}", delete_secret_response);
-        delete_secret_response.expect("Unable to get delete secret response");
-        Ok(())
+        Ok(delete_secret_response?).map(|_| ())
     }
 
-    async fn delete_secret_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<(), SmClientErr> {
-        let secret = self
-            .get_secret_string_by_name(name, filters)
-            .await
-            .expect("Unable to get secret string by name");
-        self.delete_secret(&secret.arn).await.expect("Unable to delete secret");
-        Ok(())
+    async fn delete_secret_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<()> {
+        let secret = self.get_secret_string_by_name(name, filters).await?;
+        self.delete_secret(&secret.arn).await
     }
 
-    async fn describe_secret(&self, arn: &str) -> Result<SecretDetails, SmClientErr> {
+    async fn describe_secret(&self, arn: &str) -> Result<SecretDetails> {
         let describe_secret_request = DescribeSecretRequest {
             secret_id: arn.to_string(),
             ..Default::default()
@@ -81,15 +74,15 @@ impl SmClient for DefaultSmClient {
         info!("Will send describe secret request {:?}", describe_secret_request);
         let describe_secret_response = self.sm_client.describe_secret(describe_secret_request).await;
         info!("Did receive describe secret result {:?}", describe_secret_response);
-        Ok(describe_secret_response.expect("Unable to get secret response")).map(|s| SecretDetails {
-            arn: s.arn.expect("Unable to get secret arn"),
-            name: s.name.expect("Unable to get secret name"),
+        Ok(describe_secret_response?).map(|s| SecretDetails {
+            arn: s.arn.unwrap(),
+            name: s.name.unwrap(),
             tags: translate_tags(s.tags),
             description: s.description,
         })
     }
 
-    async fn get_secret_string(&self, arn: &str) -> Result<SecretString, SmClientErr> {
+    async fn get_secret_string(&self, arn: &str) -> Result<SecretString> {
         let get_secret_value_request = GetSecretValueRequest {
             secret_id: arn.to_string(),
             ..Default::default()
@@ -97,43 +90,28 @@ impl SmClient for DefaultSmClient {
         info!("Will send get secret value request {:?}", get_secret_value_request);
         let get_secret_value_response = self.sm_client.get_secret_value(get_secret_value_request).await;
         info!("Did receive get secret value response {:?}", get_secret_value_response);
-        Ok(get_secret_value_response.expect("Unable to get get secret value response")).map(|s| SecretString {
-            arn: s.arn.expect("Unable to get secret arn"),
-            name: s.name.expect("Unable to get secret name"),
-            value: s.secret_string.expect("Unable to get secret string"),
+        Ok(get_secret_value_response?).map(|s| SecretString {
+            arn: s.arn.unwrap(),
+            name: s.name.unwrap(),
+            value: s.secret_string.unwrap(),
         })
     }
 
-    async fn get_secret_string_by_name(
-        &self,
-        name: &str,
-        filters: Option<&[Filter]>,
-    ) -> Result<SecretString, SmClientErr> {
+    async fn get_secret_string_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<SecretString> {
         let all_filters: &[Filter] = &[
             &vec![("name".to_string(), vec![name.to_string()])],
             filters.unwrap_or_default(),
         ]
         .concat();
-        let secrets = self
-            .list_all_secrets(Some(&all_filters))
-            .await
-            .expect("Unable to list all secrets");
-        Ok(self
-            .get_secret_string(&secrets.iter().next().expect("Unable to get secret").arn)
-            .await
-            .expect("Unable to get secret string"))
-        .map(|s| SecretString {
+        let secrets = self.list_all_secrets(Some(&all_filters)).await?;
+        Ok(self.get_secret_string(&secrets.iter().next().unwrap().arn).await?).map(|s| SecretString {
             arn: s.arn,
             name: s.name,
             value: s.value,
         })
     }
 
-    async fn list_secrets(
-        &self,
-        filters: Option<&[Filter]>,
-        next_token: Option<&str>,
-    ) -> Result<SecretsPage, SmClientErr> {
+    async fn list_secrets(&self, filters: Option<&[Filter]>, next_token: Option<&str>) -> Result<SecretsPage> {
         let list_secrets_request = ListSecretsRequest {
             filters: filters.map(|fs| {
                 fs.iter()
@@ -150,13 +128,13 @@ impl SmClient for DefaultSmClient {
         // TODO: Use better error handling
         let list_secrets_response = self.sm_client.list_secrets(list_secrets_request).await;
         info!("Did receive list secrets response {:?}", list_secrets_response);
-        Ok(list_secrets_response.expect("Unable to get list secrets response")).map(|lsr| {
+        Ok(list_secrets_response?).map(|lsr| {
             (
                 lsr.secret_list.map_or(Vec::new(), |sl| {
                     sl.into_iter()
                         .map(|s| SecretDetails {
-                            arn: s.arn.expect("Unable to get secret arn"),
-                            name: s.name.expect("Unable to get secret name"),
+                            arn: s.arn.unwrap(),
+                            name: s.name.unwrap(),
                             tags: translate_tags(s.tags),
                             description: s.description,
                         })
@@ -167,16 +145,13 @@ impl SmClient for DefaultSmClient {
         })
     }
 
-    async fn list_all_secrets(&self, filters: Option<&[Filter]>) -> Result<Vec<SecretDetails>, SmClientErr> {
+    async fn list_all_secrets(&self, filters: Option<&[Filter]>) -> Result<Vec<SecretDetails>> {
         let mut vec: Vec<SecretDetails> = Vec::new();
         // Couldn't get Option<&str> to work
         let mut next_token: Option<String> = None;
         loop {
             // TODO: Use better error handling
-            let mut page = self
-                .list_secrets(filters, next_token.as_deref())
-                .await
-                .expect("Unable to list secrets");
+            let mut page = self.list_secrets(filters, next_token.as_deref()).await?;
             vec.append(&mut page.0);
             next_token = page.1;
             if next_token.is_none() {
@@ -186,8 +161,9 @@ impl SmClient for DefaultSmClient {
         Ok(vec)
     }
 
-    async fn put_secret_string(&self, arn: &str, value: &str) -> Result<(), SmClientErr> {
+    async fn put_secret_string(&self, arn: &str, value: &str) -> Result<()> {
         let put_secret_value_request = PutSecretValueRequest {
+            client_request_token: Some(uuid::Uuid::new_v4().to_string()),
             secret_id: arn.to_string(),
             secret_string: Some(value.to_string()),
             ..Default::default()
@@ -195,20 +171,11 @@ impl SmClient for DefaultSmClient {
         info!("Will send put secret value request {:?}", put_secret_value_request);
         let put_secret_value_response = self.sm_client.put_secret_value(put_secret_value_request).await;
         info!("Did receive put secret value response {:?}", put_secret_value_response);
-        put_secret_value_response.expect("Unable to get put secret value response");
-        Ok(())
+        Ok(put_secret_value_response?).map(|_| ())
     }
 
-    async fn put_secret_string_by_name(
-        &self,
-        name: &str,
-        value: &str,
-        filters: Option<&[Filter]>,
-    ) -> Result<(), SmClientErr> {
-        let secret = self
-            .get_secret_string_by_name(name, filters)
-            .await
-            .expect("Unable to get secret string by name");
+    async fn put_secret_string_by_name(&self, name: &str, value: &str, filters: Option<&[Filter]>) -> Result<()> {
+        let secret = self.get_secret_string_by_name(name, filters).await?;
         self.put_secret_string(&secret.arn, value).await
     }
 }
@@ -216,12 +183,7 @@ impl SmClient for DefaultSmClient {
 fn translate_tags(tags: Option<Vec<rusoto_secretsmanager::Tag>>) -> Vec<(String, String)> {
     tags.map_or(Vec::new(), |tags| {
         tags.into_iter()
-            .map(|tag| {
-                (
-                    tag.key.expect("Unable to get tag key"),
-                    tag.value.expect("Unable to get tag value"),
-                )
-            })
+            .map(|tag| (tag.key.unwrap(), tag.value.unwrap()))
             .collect()
     })
 }
