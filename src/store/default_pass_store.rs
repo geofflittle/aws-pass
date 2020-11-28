@@ -141,7 +141,7 @@ impl PassStore for DefaultPassStore {
 
     async fn edit(&self, name: &str) {
         let password = self.get_password_by_name(name).await.unwrap();
-        let updated_password = edit::edit(password.value).unwrap();
+        let updated_password = edit::edit(password.value).unwrap().trim_end().to_string();
         self.pass_dao
             .update_password(&password.id, &updated_password)
             .await
