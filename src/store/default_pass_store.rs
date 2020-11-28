@@ -1,13 +1,29 @@
-use crate::dao::pass_dao::{
-    Filter, PassDao, PassDaoErr, Password, PasswordDetails,
+use super::pass_store::PassStore;
+use crate::{
+    creds::StsLocalMfaCredsProvider,
+    dao::{
+        pass_dao::Tag,
+        pass_dao::{Filter, PassDao},
+        sm_pass_dao::SmPassDao,
+    },
+    util,
 };
-
-use super::pass_store::{PassStore, PassStoreErr};
 use async_trait::async_trait;
-use std::{
-    io::{self, BufRead},
-    path,
-};
+use rusoto_core::Region;
+use std::process;
+use std::{fs, path};
+use util::write_lines;
+
+const CREDENTIALS_FILENAME: &str = ".credentials";
+const TOKEN_SERIAL_FILENAME: &str = ".token-serial";
+const STORE_TAGS: (&str, &str) = ("aws-pass", "true");
+const STORE_FILTERS: [(&str, [&str; 1]); 2] = [("tag-key", ["aws-pass"]), ("tag-value", ["true"])];
+
+struct StoreDetails {
+    access_key_id: String,
+    secret_access_key: String,
+    token_serial: String,
+}
 
 pub struct DefaultPassStore {
     store_dir: path::PathBuf,
@@ -15,57 +31,129 @@ pub struct DefaultPassStore {
 }
 
 impl DefaultPassStore {
-    pub fn new(
-        store_dir: path::PathBuf,
-        pass_dao: Box<dyn PassDao + Send + Sync>,
-    ) -> Box<dyn PassStore> {
+    pub fn new(store_dir: path::PathBuf, region: &Region) -> Box<dyn PassStore> {
+        let creds_provider = StsLocalMfaCredsProvider::new(
+            store_dir.join(CREDENTIALS_FILENAME),
+            store_dir.join(TOKEN_SERIAL_FILENAME),
+            region,
+        );
         Box::new(DefaultPassStore {
             store_dir,
-            pass_dao,
+            pass_dao: Box::new(SmPassDao::new(creds_provider, region)),
         })
     }
 
-    fn read_first_stdin_line(&self) -> String {
-        let mut value = String::new();
-        let stdin = io::stdin();
-        stdin.lock().read_line(&mut value).unwrap();
-        value
+    fn ensure_empty_store_dir(&self) {
+        if self.store_dir.exists()
+            && self.store_dir.is_dir()
+            && self
+                .store_dir
+                .read_dir()
+                .expect(&format!("Can't read store dir {}", self.store_dir.display()))
+                .next()
+                .is_some()
+        {
+            fatal_println!("Store dir {} not empty, not overwriting", self.store_dir.display())
+        }
+        if self.store_dir.exists() && self.store_dir.is_file() {
+            fatal_println!("Store dir {} not a directory", self.store_dir.display())
+        }
+        if !self.store_dir.exists() {
+            println!("Creating store dir at {}", self.store_dir.display());
+            fs::create_dir(&self.store_dir)
+                .expect(&format!("Unable to create store dir at {}", self.store_dir.display()));
+        }
+    }
+
+    fn get_store_details(&self) -> StoreDetails {
+        let access_key_id = util::prompt_non_empty_str("AWS Access Key Id");
+        let secret_access_key = util::prompt_non_empty_str("AWS Secret Access Key");
+        let token_serial = util::prompt_non_empty_str("MFA Token Serial Number");
+        StoreDetails {
+            access_key_id,
+            secret_access_key,
+            token_serial,
+        }
+    }
+
+    fn write_store_details(
+        &self,
+        StoreDetails {
+            access_key_id,
+            secret_access_key,
+            token_serial,
+        }: &StoreDetails,
+    ) {
+        let creds_path = self.store_dir.join(CREDENTIALS_FILENAME);
+        write_lines(
+            &creds_path,
+            vec![
+                "[default]\n",
+                format!("aws_access_key_id={}\n", access_key_id).as_ref(),
+                format!("aws_secret_access_key={}\n", secret_access_key).as_ref(),
+            ],
+        );
+
+        let token_serial_path = self.store_dir.join(TOKEN_SERIAL_FILENAME);
+        write_lines(&token_serial_path, vec![token_serial.as_ref()]);
     }
 }
 
 #[async_trait]
 impl PassStore for DefaultPassStore {
     async fn init(&self) {
-        // Check that creds file is in store_dir
-        todo!()
+        self.ensure_empty_store_dir();
+        println!(
+            "Please provide AWS credentials for a user with an associated policy with MFA-protected SecretsManager \
+            permissions"
+        );
+        let creds = self.get_store_details();
+        self.write_store_details(&creds);
     }
 
     async fn list(&self, prefix: Option<&str>) {
+        let ssfilters = STORE_FILTERS
+            .iter()
+            .map(|f| (f.0.to_string(), f.1.iter().map(|s| s.to_string()).collect()))
+            .collect();
         let filters: Vec<Filter> = [
-            vec![
-                ("tag-key".to_string(), vec!["aws-pass".to_string()]),
-                ("tag-value".to_string(), vec!["true".to_string()]),
-            ],
+            ssfilters,
             prefix
                 .map(|p| vec![("name".to_string(), vec![p.to_string()])])
                 .unwrap_or_default(),
         ]
         .concat();
-        let passwords = self.pass_dao.list_passwords(&filters).await.unwrap();
+        let passwords = self
+            .pass_dao
+            .list_passwords(&filters)
+            .await
+            .expect("Unable to list passwords");
         println!("{:?}", passwords);
     }
 
-    async fn show(&self, id: &str) {
-        let password = self.pass_dao.get_password(id).await.unwrap();
+    async fn show(&self, name: &str) {
+        let filters: Vec<Filter> = STORE_FILTERS
+            .iter()
+            .map(|f| (f.0.to_string(), f.1.iter().map(|s| s.to_string()).collect()))
+            .collect();
+        let password = self
+            .pass_dao
+            .get_password_by_name(name, Some(&filters))
+            .await
+            .expect("Unable to get password");
         println!("{:?}", password);
     }
 
     async fn insert(&self, name: &str) {
-        let value = self.read_first_stdin_line();
-        self.pass_dao.create_password(name, &value).await.unwrap();
+        let value = util::prompt_stdin_line("Enter password:");
+        let tags: Vec<Tag> = vec![(STORE_TAGS.0.to_string(), STORE_TAGS.1.to_string())];
+        self.pass_dao
+            .create_password(name, &value, Some(&tags))
+            .await
+            .expect("Unable to create password");
     }
 
-    async fn edit(&self, id: &str) {
+    async fn edit(&self, name: &str) {
         // Will need to get the password and open an editor
         todo!()
     }
@@ -74,7 +162,14 @@ impl PassStore for DefaultPassStore {
         todo!()
     }
 
-    async fn remove(&self, id: &str) {
-        self.pass_dao.delete_password(id).await.unwrap();
+    async fn remove(&self, name: &str) {
+        let filters: Vec<Filter> = STORE_FILTERS
+            .iter()
+            .map(|f| (f.0.to_string(), f.1.iter().map(|s| s.to_string()).collect()))
+            .collect();
+        self.pass_dao
+            .delete_password_by_name(name, Some(&filters))
+            .await
+            .expect("Unable to delete password");
     }
 }

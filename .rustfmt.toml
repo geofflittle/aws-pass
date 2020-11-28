@@ -1,4 +1,4 @@
-max_width = 80
+max_width = 120
 reorder_imports = true
 reorder_modules = true
 tab_spaces = 4

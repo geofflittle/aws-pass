@@ -15,6 +15,7 @@ impl PassDao for LocalPassDao {
         &self,
         name: &str,
         value: &str,
+        tags: Option<&[super::pass_dao::Tag]>,
     ) -> Result<String, PassDaoErr> {
         todo!()
     }
@@ -23,15 +24,36 @@ impl PassDao for LocalPassDao {
         todo!()
     }
 
-    async fn update_password(
+    async fn get_password_by_name(
         &self,
-        id: &str,
+        name: &str,
+        filters: Option<&[super::pass_dao::Filter]>,
+    ) -> Result<Password, PassDaoErr> {
+        todo!()
+    }
+
+    async fn update_password(&self, id: &str, value: &str) -> Result<(), PassDaoErr> {
+        todo!()
+    }
+
+    async fn update_password_by_name(
+        &self,
+        name: &str,
         value: &str,
+        filters: Option<&[super::pass_dao::Filter]>,
     ) -> Result<(), PassDaoErr> {
         todo!()
     }
 
     async fn delete_password(&self, id: &str) -> Result<(), PassDaoErr> {
+        todo!()
+    }
+
+    async fn delete_password_by_name(
+        &self,
+        name: &str,
+        filters: Option<&[super::pass_dao::Filter]>,
+    ) -> Result<(), PassDaoErr> {
         todo!()
     }
 
