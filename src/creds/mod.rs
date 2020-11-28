@@ -9,10 +9,12 @@ use async_trait::async_trait;
 use rusoto_core::{credential, Region};
 use std::{
     path::{self, PathBuf},
-    sync::Mutex,
+    sync::Arc,
 };
+use tokio::sync::Mutex;
 
 pub struct StsLocalMfaCredsProvider {
+    cached_creds: Arc<Mutex<Option<Credentials>>>,
     token_serial_path: path::PathBuf,
     sts_client: Box<dyn StsClient + Send + Sync>,
 }
@@ -24,6 +26,7 @@ impl StsLocalMfaCredsProvider {
         region: &Region,
     ) -> impl credential::ProvideAwsCredentials {
         StsLocalMfaCredsProvider {
+            cached_creds: Arc::new(Mutex::new(None)),
             token_serial_path,
             sts_client: Box::new(DefaultStsClient::new(
                 credential::ProfileProvider::with_default_configuration(creds_path),
@@ -50,29 +53,12 @@ impl StsLocalMfaCredsProvider {
 #[async_trait]
 impl credential::ProvideAwsCredentials for StsLocalMfaCredsProvider {
     async fn credentials(&self) -> Result<credential::AwsCredentials, credential::CredentialsError> {
-        // match self.cached_creds.is_expired() {
-        //     false => {
-        //         return Ok(self.cached_creds.to_aws_creds());
-        //     }
-        //     true => {
-        //         let new_creds = self.get_creds().await;
-        //         *self.cached_creds = new_creds;
-        //         return Ok(new_creds.to_aws_creds());
-        //     }
-        // }
-        //
-        //
-        // let mutex = self.cached_creds.try_read().expect("Unable to get creds lock");
-        // match mutex.is_expired() {
-        //     false => {
-        //         return Ok(mutex.to_aws_creds());
-        //     }
-        //     true => {
-        //         let new_creds = self.get_creds().await;
-        //         *mutex = Box::new(new_creds);
-        //         return Ok(new_creds.to_aws_creds());
-        //     }
-        // }
-        Ok(self.get_creds().await.to_aws_creds())
+        let mut mutex = self.cached_creds.lock().await;
+        if mutex.is_some() && !mutex.as_ref().unwrap().is_expired() {
+            return Ok(mutex.as_ref().unwrap().to_aws_creds());
+        }
+        let new_creds = self.get_creds().await;
+        *mutex = Some(new_creds.clone());
+        return Ok(new_creds.to_aws_creds());
     }
 }

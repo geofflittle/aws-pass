@@ -20,7 +20,7 @@ pub trait Creds {
     fn to_aws_creds(&self) -> AwsCredentials;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Credentials {
     pub access_key_id: String,
     pub secret_access_key: String,
