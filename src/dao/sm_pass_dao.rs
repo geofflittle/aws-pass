@@ -2,7 +2,7 @@ use super::pass_dao::{Filter, PassDao, Password, PasswordDetails, Tag};
 use crate::client::sm::{default_sm_client::DefaultSmClient, sm_client::SmClient};
 use anyhow::Result;
 use async_trait::async_trait;
-use rusoto_core::{credential, Region};
+use rusoto_core::{credential::ProvideAwsCredentials, Region};
 
 pub struct SmPassDao {
     sm_client: Box<dyn SmClient + Send + Sync>,
@@ -11,7 +11,7 @@ pub struct SmPassDao {
 impl SmPassDao {
     pub fn new<P>(provide_aws_creds: P, region: &Region) -> impl PassDao
     where
-        P: credential::ProvideAwsCredentials + Send + Sync + 'static,
+        P: ProvideAwsCredentials + Send + Sync + 'static,
     {
         SmPassDao {
             sm_client: Box::new(DefaultSmClient::new(provide_aws_creds, region)),
