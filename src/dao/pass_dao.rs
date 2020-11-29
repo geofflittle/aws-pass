@@ -3,7 +3,14 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait PassDao {
-    async fn create_password(&self, name: &str, value: &str, tags: Option<&[Tag]>) -> Result<String>;
+    async fn create_password(&self, name: &str, value: &str, tags: Option<&[Tag]>) -> Result<Password>;
+    async fn create_random_password(
+        &self,
+        name: &str,
+        exclude_chars: Option<&str>,
+        length: Option<&i64>,
+        tags: Option<&[Tag]>,
+    ) -> Result<Password>;
     async fn get_password(&self, id: &str) -> Result<Password>;
     async fn get_password_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<Password>;
     async fn update_password(&self, id: &str, value: &str) -> Result<()>;
@@ -18,6 +25,7 @@ pub type Filter = (String, Vec<String>);
 
 #[derive(Debug)]
 pub struct PasswordDetails {
+    pub id: String,
     pub name: String,
 }
 

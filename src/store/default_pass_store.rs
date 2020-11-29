@@ -11,8 +11,8 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
-use std::process;
-use std::{fs, path};
+use std::fs;
+use std::{path::PathBuf, process};
 use util::write_lines;
 
 const CREDENTIALS_FILENAME: &str = ".credentials";
@@ -28,12 +28,12 @@ struct StoreDetails {
 }
 
 pub struct DefaultPassStore {
-    store_dir: path::PathBuf,
+    store_dir: PathBuf,
     pass_dao: Box<dyn PassDao + Send + Sync>,
 }
 
 impl DefaultPassStore {
-    pub fn new(store_dir: path::PathBuf, region: &Region) -> Box<dyn PassStore> {
+    pub fn new(store_dir: PathBuf, region: &Region) -> Box<dyn PassStore> {
         let creds_provider = StsLocalMfaCredsProvider::new(
             store_dir.join(CREDENTIALS_FILENAME),
             store_dir.join(TOKEN_SERIAL_FILENAME),
@@ -125,12 +125,13 @@ impl PassStore for DefaultPassStore {
         ]
         .concat();
         let passwords = self.pass_dao.list_passwords(&filters).await.unwrap();
-        println!("{:?}", passwords);
+        let names: Vec<String> = passwords.into_iter().map(|p| p.name).collect();
+        println!("{}", names.join("\n"));
     }
 
     async fn show(&self, name: &str) {
         let password = self.get_password_by_name(name).await.unwrap();
-        println!("{:?}", password);
+        println!("{}", password.value);
     }
 
     async fn insert(&self, name: &str) {
@@ -148,8 +149,14 @@ impl PassStore for DefaultPassStore {
             .unwrap();
     }
 
-    async fn generate(&self, name: &str) {
-        todo!()
+    async fn generate(&self, name: &str, exclude_chars: Option<&str>, length: Option<&i64>) {
+        let tags: Vec<Tag> = vec![(STORE_TAGS.0.to_string(), STORE_TAGS.1.to_string())];
+        let password = self
+            .pass_dao
+            .create_random_password(name, exclude_chars, length, Some(&tags))
+            .await
+            .unwrap();
+        println!("{}", password.value);
     }
 
     async fn remove(&self, name: &str) {

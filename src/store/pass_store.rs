@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use std::io;
 
 #[async_trait]
 pub trait PassStore {
@@ -8,6 +7,6 @@ pub trait PassStore {
     async fn show(&self, name: &str);
     async fn insert(&self, name: &str);
     async fn edit(&self, name: &str);
-    async fn generate(&self, name: &str);
+    async fn generate(&self, name: &str, exclude_chars: Option<&str>, length: Option<&i64>);
     async fn remove(&self, name: &str);
 }

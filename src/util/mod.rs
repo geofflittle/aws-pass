@@ -1,12 +1,13 @@
 use std::{
-    fs,
-    io::{self, BufRead, Write},
-    iter, path, process,
+    fs::File,
+    io::{self, BufRead, BufReader, LineWriter, Write},
+    path::PathBuf,
+    process,
 };
 
-pub fn read_first_line(path: &path::PathBuf) -> Option<String> {
-    let file = fs::File::open(path).unwrap();
-    let buffer = io::BufReader::new(file);
+pub fn read_first_line(path: &PathBuf) -> Option<String> {
+    let file = File::open(path).unwrap();
+    let buffer = BufReader::new(file);
     let mut lines_iter = buffer.lines().map(|l| l.unwrap());
     return lines_iter.next();
 }
@@ -27,12 +28,12 @@ pub fn prompt_non_empty_str(name: &str) -> String {
     line
 }
 
-pub fn write_lines<'a, I>(path: &path::PathBuf, lines: I)
+pub fn write_lines<'a, I>(path: &PathBuf, lines: I)
 where
-    I: iter::IntoIterator<Item = &'a str>,
+    I: IntoIterator<Item = &'a str>,
 {
-    let file = fs::File::create(path).unwrap();
-    let mut lw = io::LineWriter::new(file);
+    let file = File::create(path).unwrap();
+    let mut lw = LineWriter::new(file);
     lines.into_iter().for_each(|line| {
         lw.write_all(line.as_bytes()).unwrap();
     });

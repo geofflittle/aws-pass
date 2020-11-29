@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use log::info;
 use rusoto_core::{credential, HttpClient, Region};
 use rusoto_secretsmanager::{
-    CreateSecretRequest, DeleteSecretRequest, DescribeSecretRequest, GetSecretValueRequest, ListSecretsRequest,
-    PutSecretValueRequest, SecretsManager, SecretsManagerClient,
+    CreateSecretRequest, DeleteSecretRequest, DescribeSecretRequest, GetRandomPasswordRequest, GetSecretValueRequest,
+    ListSecretsRequest, PutSecretValueRequest, SecretsManager, SecretsManagerClient,
 };
+use uuid::Uuid;
 
 pub struct DefaultSmClient {
     sm_client: Box<dyn SecretsManager + Send + Sync>,
@@ -31,7 +32,7 @@ impl DefaultSmClient {
 impl SmClient for DefaultSmClient {
     async fn create_secret_string(&self, name: &str, value: &str, tags: Option<&[Tag]>) -> Result<String> {
         let create_secret_request = CreateSecretRequest {
-            client_request_token: Some(uuid::Uuid::new_v4().to_string()),
+            client_request_token: Some(Uuid::new_v4().to_string()),
             name: name.to_string(),
             secret_string: Some(value.to_string()),
             tags: tags.map(|ts| {
@@ -59,11 +60,6 @@ impl SmClient for DefaultSmClient {
         let delete_secret_response = self.sm_client.delete_secret(delete_secret_request).await;
         info!("Did receive delete secret response {:?}", delete_secret_response);
         Ok(delete_secret_response?).map(|_| ())
-    }
-
-    async fn delete_secret_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<()> {
-        let secret = self.get_secret_string_by_name(name, filters).await?;
-        self.delete_secret(&secret.arn).await
     }
 
     async fn describe_secret(&self, arn: &str) -> Result<SecretDetails> {
@@ -94,20 +90,6 @@ impl SmClient for DefaultSmClient {
             arn: s.arn.unwrap(),
             name: s.name.unwrap(),
             value: s.secret_string.unwrap(),
-        })
-    }
-
-    async fn get_secret_string_by_name(&self, name: &str, filters: Option<&[Filter]>) -> Result<SecretString> {
-        let all_filters: &[Filter] = &[
-            &vec![("name".to_string(), vec![name.to_string()])],
-            filters.unwrap_or_default(),
-        ]
-        .concat();
-        let secrets = self.list_all_secrets(Some(&all_filters)).await?;
-        Ok(self.get_secret_string(&secrets.iter().next().unwrap().arn).await?).map(|s| SecretString {
-            arn: s.arn,
-            name: s.name,
-            value: s.value,
         })
     }
 
@@ -145,25 +127,9 @@ impl SmClient for DefaultSmClient {
         })
     }
 
-    async fn list_all_secrets(&self, filters: Option<&[Filter]>) -> Result<Vec<SecretDetails>> {
-        let mut vec: Vec<SecretDetails> = Vec::new();
-        // Couldn't get Option<&str> to work
-        let mut next_token: Option<String> = None;
-        loop {
-            // TODO: Use better error handling
-            let mut page = self.list_secrets(filters, next_token.as_deref()).await?;
-            vec.append(&mut page.0);
-            next_token = page.1;
-            if next_token.is_none() {
-                break;
-            }
-        }
-        Ok(vec)
-    }
-
     async fn put_secret_string(&self, arn: &str, value: &str) -> Result<()> {
         let put_secret_value_request = PutSecretValueRequest {
-            client_request_token: Some(uuid::Uuid::new_v4().to_string()),
+            client_request_token: Some(Uuid::new_v4().to_string()),
             secret_id: arn.to_string(),
             secret_string: Some(value.to_string()),
             ..Default::default()
@@ -174,9 +140,22 @@ impl SmClient for DefaultSmClient {
         Ok(put_secret_value_response?).map(|_| ())
     }
 
-    async fn put_secret_string_by_name(&self, name: &str, value: &str, filters: Option<&[Filter]>) -> Result<()> {
-        let secret = self.get_secret_string_by_name(name, filters).await?;
-        self.put_secret_string(&secret.arn, value).await
+    async fn get_random_password(&self, exclude_chars: Option<&str>, length: Option<&i64>) -> Result<String> {
+        let get_random_password_request = GetRandomPasswordRequest {
+            exclude_characters: exclude_chars.map(|s| s.to_string()),
+            password_length: length.map(|l| l.clone()),
+            ..Default::default()
+        };
+        info!(
+            "Will send get random password request {:?}",
+            get_random_password_request
+        );
+        let get_random_password_response = self.sm_client.get_random_password(get_random_password_request).await?;
+        info!(
+            "Did receive get random password response {:?}",
+            get_random_password_response
+        );
+        Ok(get_random_password_response.random_password.unwrap())
     }
 }
 

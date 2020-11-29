@@ -38,6 +38,10 @@ enum Command {
     Generate {
         #[structopt(short, long)]
         name: String,
+        #[structopt(short, long)]
+        exclude_chars: Option<String>,
+        #[structopt(short, long)]
+        length: Option<i64>,
     },
     /// Removes a password given its **name**.
     Remove {
@@ -66,7 +70,15 @@ async fn main() {
         Command::Show { name } => pass_store.show(&name).await,
         Command::Insert { name } => pass_store.insert(&name).await,
         Command::Edit { name } => pass_store.edit(&name).await,
-        Command::Generate { name } => pass_store.generate(&name).await,
+        Command::Generate {
+            name,
+            exclude_chars,
+            length,
+        } => {
+            pass_store
+                .generate(&name, exclude_chars.as_deref(), length.as_ref())
+                .await
+        }
         Command::Remove { name } => pass_store.remove(&name).await,
     }
 }

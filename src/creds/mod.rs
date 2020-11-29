@@ -6,30 +6,26 @@ use crate::{
     util::{prompt_stdin_line, read_first_line},
 };
 use async_trait::async_trait;
-use rusoto_core::{credential, Region};
-use std::{
-    path::{self, PathBuf},
-    sync::Arc,
+use rusoto_core::{
+    credential::{AwsCredentials, CredentialsError, ProfileProvider, ProvideAwsCredentials},
+    Region,
 };
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
 pub struct StsLocalMfaCredsProvider {
     cached_creds: Arc<Mutex<Option<Credentials>>>,
-    token_serial_path: path::PathBuf,
+    token_serial_path: PathBuf,
     sts_client: Box<dyn StsClient + Send + Sync>,
 }
 
 impl StsLocalMfaCredsProvider {
-    pub fn new(
-        creds_path: PathBuf,
-        token_serial_path: PathBuf,
-        region: &Region,
-    ) -> impl credential::ProvideAwsCredentials {
+    pub fn new(creds_path: PathBuf, token_serial_path: PathBuf, region: &Region) -> impl ProvideAwsCredentials {
         StsLocalMfaCredsProvider {
             cached_creds: Arc::new(Mutex::new(None)),
             token_serial_path,
             sts_client: Box::new(DefaultStsClient::new(
-                credential::ProfileProvider::with_default_configuration(creds_path),
+                ProfileProvider::with_default_configuration(creds_path),
                 region,
             )),
         }
@@ -48,8 +44,8 @@ impl StsLocalMfaCredsProvider {
 }
 
 #[async_trait]
-impl credential::ProvideAwsCredentials for StsLocalMfaCredsProvider {
-    async fn credentials(&self) -> Result<credential::AwsCredentials, credential::CredentialsError> {
+impl ProvideAwsCredentials for StsLocalMfaCredsProvider {
+    async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
         let mut mutex = self.cached_creds.lock().await;
         if mutex.is_some() && !mutex.as_ref().unwrap().is_expired() {
             return Ok(mutex.as_ref().unwrap().to_aws_creds());

@@ -28,7 +28,7 @@ pub struct Credentials {
 
 impl Creds for Credentials {
     fn is_expired(&self) -> bool {
-        self.expiration.le(&chrono::Utc::now())
+        self.expiration.le(&Utc::now())
     }
 
     fn to_aws_creds(&self) -> AwsCredentials {
@@ -40,14 +40,3 @@ impl Creds for Credentials {
         )
     }
 }
-
-// impl Default for Credentials {
-//     fn default() -> Self {
-//         Credentials {
-//             access_key_id: "".to_string(),
-//             secret_access_key: "".to_string(),
-//             session_token: "".to_string(),
-//             expiration: Utc::now(),
-//         }
-//     }
-// }
