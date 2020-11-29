@@ -62,7 +62,7 @@ The built executable will be located in `target/release/aws-pass`.
 
 ## Usage
 
-`aws-pass` has seven commands: `init`, `list`, `show`, `insert`, `edit`, `generate`, and `remove`.  Each of these commands will ask for an MFA 
+`aws-pass` has seven commands: `init`, `list`, `show`, `insert`, `edit`, `generate`, and `remove`.  Each of these commands will ask for an MFA token code. 
 
 ### `init`
 
@@ -131,10 +131,12 @@ The following is a list of improvements for the tool for which I welcome help im
 
 * Hide the password as it's being entered into stdin.  Ask for it twice to confirm the value.
 * Allow copying a password's value to the clipboard without showing it on stdout.  Auto-clearing the clipboard after 30 seconds.
-* Adding an interactive session so that re-entering an MFA token is not required between comands.
+* Adding an interactive session so that re-entering an MFA token is not required between commands.
 
 ## About and Motivation
 
 I wrote `aws-pass` because I was tired of attempting to use the Linux tool `pass` on multiple different computers and needing to export and import my gpg key.  With `aws-pass`, I'm able to access my passwords from anywhere as long as I have my MFA token.
 
 Additionally, I used this project in order to learn Rust which I am still very much a novice at writing.  If you are a more seasoned Rustacean, please feel free to make suggestions on how to improve the code.
+
+Crab On! :crab:
